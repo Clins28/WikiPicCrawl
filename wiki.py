@@ -7,10 +7,22 @@ import os
 import urllib.request
 import sys
 import datetime
+import threading
+import linecache
+
+
+class DownloadThread(threading.Thread):
+    def __init__(self, threadID, name):
+        threading.Thread.__init__(self)
+        self.threadID = threadID
+        self.name = name
+
+    def run(self):
+        main(self.name)
+
 
 urlbase = 'https://en.wikipedia.org'
-
-count = 1
+resume_lock = threading.Lock()
 res = 0
 retry = 0
 
@@ -64,6 +76,7 @@ def IsMatch(string, mstring):
     match = pattern.search(string)
     return match
 
+
 #################################################################
 # FunctionName:   ListTransString(List)
 # Function:       List trans to string
@@ -84,9 +97,10 @@ def GetReString(string, mstring):
     pattern = re.compile(mstring)
     string = ListTransString(pattern.findall(string))
     return string
-    
-#once log with datetime
-def Recordlog(logname, str, method = 'a'):
+
+
+# once log with datetime
+def Recordlog(logname, str, method='a'):
     with open('./' + logname + '.txt', method) as log:
         nowTime = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         log.write(nowTime + '\t\t' + str + '\n')
@@ -133,43 +147,74 @@ def DownLoadPic(img_url, img_pos, picname):
     urllib.request.urlretrieve('https:' + img_url, filename=picname)
 
 
-def main():
-    global res
-    global count
-    fplen = len(open('./90Wid&name.txt', 'rU', encoding='utf-8').readlines())
+def getresumeinfo():
     with open('./resume.txt', 'r', encoding='utf-8') as ress:
-        rid = ress.readline()
-        count = ress.readline()
-        if '' != count:
-            count = int(count)
+        fcount = ress.readline()
+        if '' != fcount:
+            fcount = int(fcount)
         else:
-            count = 1
-        print('rid = ' + rid)
+            fcount = 1
+        return fcount
+
+
+def main(threads):
+    global res
+    count = 1
+    fplen = len(open('./90Wid&name.txt', 'rU', encoding='utf-8').readlines())
+
     with open('./90Wid&name.txt', 'r', encoding='utf-8') as fp:
         for PendingRead in fp:
-            if rid == PendingRead or rid == '':
-                res = 1
-            if res == 1:
+            fcount = getresumeinfo()
+            if count < fcount:
+                count += 1
+                continue
+            # lock
+            resume_lock.acquire()
+            fcount = getresumeinfo()
+            if count >= fcount:
+                with open('./resume.txt', 'w', encoding='utf-8') as resume:
+                    resume.write(str(int(fcount) + 1))
+            resume_lock.release()
+            # release
+            if count >= fcount:
                 id = GetReString(PendingRead, '^.*?(?=\s)')
-                Name = GetReString(PendingRead, '(?<=\s\s).*?$')
+                name = GetReString(PendingRead, '(?<=\s\s).*?$')
                 # Name = Name.strip('"')
-                Namee = Name.replace(' ', '_')
-                url = urlbase + '/wiki/' + Namee
+                namee = name.replace(' ', '_')
+                url = urlbase + '/wiki/' + namee
 
                 Imagesrc = TryDownload(url, id)
+
                 if Imagesrc != '':
                     with open('./Imgurl.txt', 'a', encoding='utf-8') as Imgurl:
                         Imgurl.write(id + ':\t\t' + Imagesrc + '\n')
 
-                with open('./resume.txt', 'w', encoding='utf-8') as resume:
-                    resume.write(PendingRead)
-                    resume.write(str(count))
-
                 nowTime = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                print(nowTime + '\t\t' + str(count) + '/' + str(fplen) + ' finished')
+                print(nowTime + '\t\t' + str(count) + '/' + str(fplen) + ' finished' + '\t\t' + threads)
                 count = count + 1
                 time.sleep(1)
 
+            else:
+                count += 1
+
+
+def resumede():
+    with open('./resume.txt', 'r', encoding='utf-8') as resume:
+        count = resume.readline()
+    with open('./resume.txt', 'w', encoding='utf-8') as resume:
+        resume.write(str(int(count) - 5))
+
 
 if __name__ == "__main__":
-    main()
+    resumede()
+    thread1 = DownloadThread(1, 'Thread-1')
+    thread2 = DownloadThread(2, 'Thread-2')
+    thread3 = DownloadThread(3, 'Thread-3')
+    thread4 = DownloadThread(4, 'Thread-4')
+    thread5 = DownloadThread(5, 'Thread-5')
+
+    thread1.start()
+    thread2.start()
+    thread3.start()
+    thread4.start()
+    thread5.start()
