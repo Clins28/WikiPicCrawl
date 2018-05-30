@@ -107,8 +107,7 @@ def Recordlog(logname, str, method='a'):
 
 
 # Try Download
-def TryDownload(url, id):
-    retry = 0
+def TryDownload(url, id, retry):
     try:
         html = getHtml(url)
         Imagesrc = getImage(html)
@@ -125,11 +124,10 @@ def TryDownload(url, id):
         if retry < 5:
             time.sleep(3)
             retry = retry + 1
-            TryDownload(url, id)
+            TryDownload(url, id, retry)
         else:
             Recordlog('errlog', 'errlog:\t' + id + '\tFailed for\t' + str(Argument))
             time.sleep(10)
-            retry = 0
     return Imagesrc
 		
 #Download picture function
@@ -184,11 +182,11 @@ def main(threads):
                 namee = name.replace(' ', '_')
                 url = urlbase + '/wiki/' + namee
 					
-                Imagesrc = TryDownload(url, id)
+                Imagesrc = TryDownload(url, id, 0)
 
                 if Imagesrc != '':
                     with io.open('./Imgurl.txt', 'a', encoding='utf-8') as Imgurl:
-                        Imgurl.write(id + ':\t\t' + Imagesrc + '\n')
+                        Imgurl.write(unicode(id + ':\t\t' + Imagesrc + '\n'))
                     dowcount_lock.acquire()
                     dowcount += 1
                     dowcount_lock.release()
@@ -208,7 +206,7 @@ def resumede():
         count = getresumeinfo()
     if int(count) > 5:
         with io.open('./resume.txt', 'w', encoding='utf-8') as resume:
-            resume.write(str(int(count) - 5))
+            resume.write(unicode(str(int(count) - 5)))
 
 
 def GetDownloadpicnum():
